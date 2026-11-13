@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 236 72" width="236" height="72" role="img" aria-label="dossier">
+  <title>dossier</title>
+  <style>
+    .text { fill: #1f2328; }
+    .lens { stroke: #0969da; }
+    text {
+      font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
+      font-size: 52px;
+      font-weight: 600;
+    }
+    @media (prefers-color-scheme: dark) {
+      .text { fill: #e6edf3; }
+      .lens { stroke: #4493f8; }
+    }
+  </style>
+  <!-- Seven 32px monospace cells; textLength keeps them aligned with any font. -->
+  <text class="text" x="4" y="54" textLength="32" lengthAdjust="spacingAndGlyphs">d</text>
+  <!-- The first "o" is a magnifying glass, sized to the x-height. -->
+  <g class="lens" fill="none" stroke-width="5" stroke-linecap="round">
+    <circle cx="50" cy="39.5" r="11.5"/>
+    <path d="M58.5 48l5.5 5.5"/>
+  </g>
+  <text class="text" x="68" y="54" textLength="160" lengthAdjust="spacingAndGlyphs">ssier</text>
+</svg>
