@@ -1,0 +1,82 @@
+{{define "head" -}}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{with .Domain}}{{.}} · {{end}}dossier</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  :root { color-scheme: dark; --bg: #0d1117; --panel: #161b22; --border: #30363d;
+    --fg: #e6edf3; --muted: #8b949e; --accent: #3fb950;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 var(--mono); }
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 16px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin: 0 0 20px; }
+  .tagline { margin: 0; color: var(--muted); font-style: italic; }
+  .logo { display: inline-block; line-height: 0; }
+  .logo:focus-visible { outline: 2px solid #58a6ff; outline-offset: 4px; border-radius: 4px; }
+  form { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; }
+  form b { color: var(--accent); }
+  input { flex: 1; min-width: 0; padding: 6px 8px; font: inherit; color: var(--fg);
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px; }
+  input:focus { outline: none; border-color: var(--muted); }
+  .out, .loading { margin: 0; padding: 16px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 8px; overflow-x: auto; }
+  .out { white-space: pre; }
+  /* The output is streamed in after the loading line; once it exists the
+     loading line disappears. It only fades in if the lookup is slow. */
+  .loading { color: var(--muted); opacity: 0; animation: show 0s .15s forwards; }
+  .loading:has(+ .out) { display: none; }
+  @keyframes show { to { opacity: 1; } }
+  .download { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 20px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 6px;
+    background: #238636; border: 1px solid rgb(240 246 252 / .1); color: #fff;
+    font-weight: 600; text-decoration: none; }
+  .btn:hover { background: #2ea043; }
+  .btn:focus-visible { outline: 2px solid #58a6ff; outline-offset: 2px; }
+  .download span { font-size: 12px; color: var(--muted); }
+  footer { margin-top: 14px; font-size: 12px; color: var(--muted); }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+<header>
+  <a href="/" class="logo">
+    <!-- assets/logo.svg with its dark-mode colors. -->
+    <svg viewBox="0 0 236 72" width="157" height="48" role="img" aria-label="dossier">
+      <title>dossier</title>
+      <g fill="#e6edf3" font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', 'DejaVu Sans Mono', monospace" font-size="52" font-weight="600">
+        <text x="4" y="54" textLength="32" lengthAdjust="spacingAndGlyphs">d</text>
+        <text x="68" y="54" textLength="160" lengthAdjust="spacingAndGlyphs">ssier</text>
+      </g>
+      <g fill="none" stroke="#4493f8" stroke-width="5" stroke-linecap="round">
+        <circle cx="50" cy="39.5" r="11.5"/>
+        <path d="M58.5 48l5.5 5.5"/>
+      </g>
+    </svg>
+  </a>
+  <p class="tagline">WHOIS / RDAP / PAGE METADATA all-in-one</p>
+</header>
+<form action="/go" autocomplete="off">
+  <input id="d" name="d" placeholder="{{.Domain}}" spellcheck="false" autocapitalize="off" {{if not .Domain}}autofocus{{end}}>
+</form>
+{{with .Domain}}<div class="loading">looking up {{.}}…</div>
+{{end}}
+{{- end}}
+
+{{define "tail" -}}
+<div class="download">
+  <a class="btn" href="{{.ReleasesURL}}">
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M7.25 1.75a.75.75 0 0 1 1.5 0v6.69l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75ZM2.75 12.5a.75.75 0 0 0 0 1.5h10.5a.75.75 0 0 0 0-1.5H2.75Z"/></svg>
+    {{if .OS}}Download CLI for {{.OS}}{{else}}Download dossier{{end}}
+  </a>
+  <span>{{if .OS}}Also for {{index .OtherOS 0}} and {{index .OtherOS 1}}{{else}}For Windows, Mac and Linux{{end}} · free and open source</span>
+</div>
+<footer>Tool built by <a href="https://wennebro.com">Jacob Wennebro</a>.</footer>
+</main>
+</body>
+</html>
+{{end}}

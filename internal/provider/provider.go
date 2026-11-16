@@ -21,7 +21,7 @@ type rule struct {
 }
 
 var dnsRules = []rule{
-	{provider: Provider{"Cloudflare", "cloudflare"}, suffixes: []string{"ns.cloudflare.com"}},
+	{provider: Provider{"Cloudflare", "cloudflare"}, suffixes: []string{"cloudflare.com"}},
 	{provider: Provider{"Amazon Route 53", "aws"}, contains: []string{".awsdns-"}},
 	{provider: Provider{"Google Cloud DNS", "google"}, suffixes: []string{"googledomains.com"}},
 	{provider: Provider{"Google", "google"}, suffixes: []string{"google.com"}},
