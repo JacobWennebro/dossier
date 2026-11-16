@@ -16,6 +16,7 @@ func TestLookup(t *testing.T) {
 		"ns1.vercel-dns.com":            "Vercel",
 		"ns1.digitalocean.com":          "DigitalOcean",
 		"helium.ns.hetzner.de":          "Hetzner",
+		"dns1.registrar-servers.com":    "Namecheap",
 		"ns01.domaincontrol.com":        "GoDaddy",
 		"ns1.your-server.de":            "Hetzner",
 		"pdns1.ultradns.net":            "UltraDNS",

@@ -60,7 +60,7 @@ DNS, RDAP and the homepage request all run in parallel, so a typical lookup
 takes 100–500 ms.
 
 Logos exist for Akamai, Amazon Route 53, Azure DNS, bunny.net, Cloudflare,
-DigitalOcean, Google, Hetzner, one.com, Vercel, Weebly and Wix. Other
+DigitalOcean, GoDaddy, Google, Hetzner, Namecheap, one.com, Vercel, Weebly and Wix. Other
 providers are still recognized by name and get a generic globe logo.
 
 **Missing a logo or a mail provider name?** Contributions are very welcome.
@@ -144,8 +144,8 @@ dossier [flags] <domain>
 
   -color     auto (default), always or never; NO_COLOR is respected
   -logo      force a logo: akamai, aws, azure, bunny, cloudflare,
-             digitalocean, generic, google, hetzner, onecom, vercel,
-             weebly, wix or none
+             digitalocean, generic, godaddy, google, hetzner, namecheap, onecom,
+             vercel, weebly, wix or none
   -no-http   skip the homepage request
   -no-rdap   skip the RDAP registration lookup
   -timeout   overall timeout for DNS, RDAP and HTTP (default 5s)
