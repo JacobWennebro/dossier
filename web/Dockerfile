@@ -1,12 +1,16 @@
 # Build from the repository root:
 #   docker build -f web/Dockerfile -t dossier-web .
-FROM golang:1.26-alpine AS build
+#
+# Multi-arch: the build stage runs natively and Go cross-compiles for each
+# target, so building amd64 on an ARM Mac needs no emulation.
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 ARG VERSION=dev
-RUN CGO_ENABLED=0 go build -trimpath \
+ARG TARGETOS TARGETARCH
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
       -ldflags "-s -w -X dossier/internal/cli.version=${VERSION}" \
       -o /out/dossier-web ./web
 
