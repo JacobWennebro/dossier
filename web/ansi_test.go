@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"net/http"
+	"testing"
+)
 
 func TestANSIToHTML(t *testing.T) {
 	tests := map[string]string{
@@ -47,6 +50,23 @@ func TestDetectOS(t *testing.T) {
 	} {
 		if got := detectOS(ua); got != want {
 			t.Errorf("detectOS(%q) = %q, want %q", ua, got, want)
+		}
+	}
+}
+
+func TestRootDomain(t *testing.T) {
+	for host, want := range map[string]string{
+		"doss.ie":        "doss.ie",
+		"Doss.IE:443":    "doss.ie",
+		"www.doss.ie":    "www.doss.ie",
+		"localhost:8080": "fallback.com",
+		"127.0.0.1:8080": "fallback.com",
+		"[::1]:8080":     "fallback.com",
+		"":               "fallback.com",
+	} {
+		r := &http.Request{Host: host}
+		if got := rootDomain(r, "fallback.com"); got != want {
+			t.Errorf("rootDomain(Host %q) = %q, want %q", host, got, want)
 		}
 	}
 }

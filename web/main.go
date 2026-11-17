@@ -1,8 +1,7 @@
 // Command web serves dossier output as HTML, with the terminal colors kept.
 //
-//	GET /                 the output for DEFAULT_DOMAIN (doss.ie unless set)
-//	GET /{domain}         redirects to /r/{domain}
-//	GET /r/{domain}       the output of "dossier {domain}" as colored HTML
+//	GET /                 the output for the requested hostname, or DEFAULT_DOMAIN (example.com unless set)
+//	GET /{domain}         the output of "dossier {domain}" as colored HTML
 //	GET /raw/{domain}     the raw ANSI output of "dossier -color always {domain}"
 package main
 
@@ -14,6 +13,7 @@ import (
 	"html/template"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -60,7 +60,7 @@ func main() {
 	mux.HandleFunc("GET /favicon.ico", serveFavicon) // for clients that ignore the <link>; modern browsers accept SVG here
 	mux.HandleFunc("GET /robots.txt", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Write([]byte("User-agent: *\nDisallow: /r/\nDisallow: /raw/\n"))
+		w.Write([]byte("User-agent: *\nDisallow: /raw/\n"))
 	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok\n"))
@@ -87,13 +87,14 @@ func main() {
 		execute(w, r, "tail", d)
 	}
 
-	// The root page shows the lookup for the site's own domain.
-	defaultDomain, ok := normalizeDomain(envOr("DEFAULT_DOMAIN", "doss.ie"))
+	// The root page shows the lookup for the hostname it was requested on,
+	// or DEFAULT_DOMAIN when that is not a public domain (localhost, an IP).
+	defaultDomain, ok := normalizeDomain(envOr("DEFAULT_DOMAIN", "example.com"))
 	if !ok {
 		log.Fatalf("invalid DEFAULT_DOMAIN %q", os.Getenv("DEFAULT_DOMAIN"))
 	}
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		showResult(w, r, defaultDomain)
+		showResult(w, r, rootDomain(r, defaultDomain))
 	})
 
 	mux.HandleFunc("GET /{domain}", func(w http.ResponseWriter, r *http.Request) {
@@ -102,17 +103,9 @@ func main() {
 			http.NotFound(w, r)
 			return
 		}
-		lookups.get(d) // start now so the result is ready, or nearly, when the redirect lands
-		http.Redirect(w, r, "/r/"+d, http.StatusFound)
-	})
-	mux.HandleFunc("GET /r/{domain}", func(w http.ResponseWriter, r *http.Request) {
-		d, ok := normalizeDomain(r.PathValue("domain"))
-		if !ok {
-			http.NotFound(w, r)
-			return
-		}
-		if d != r.PathValue("domain") {
-			http.Redirect(w, r, "/r/"+d, http.StatusFound)
+		if d != r.PathValue("domain") { // e.g. /Google.com. → /google.com
+			lookups.get(d) // start now so the result is ready when the redirect lands
+			http.Redirect(w, r, "/"+d, http.StatusFound)
 			return
 		}
 		showResult(w, r, d)
@@ -120,7 +113,7 @@ func main() {
 	mux.HandleFunc("GET /go", func(w http.ResponseWriter, r *http.Request) {
 		if d, ok := normalizeDomain(r.FormValue("d")); ok {
 			lookups.get(d)
-			http.Redirect(w, r, "/r/"+d, http.StatusFound)
+			http.Redirect(w, r, "/"+d, http.StatusFound)
 			return
 		}
 		http.Redirect(w, r, "/", http.StatusFound)
@@ -271,6 +264,19 @@ func logRequests(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 		log.Printf("%s %s %s", r.Method, r.URL.Path, time.Since(start).Round(time.Millisecond))
 	})
+}
+
+// rootDomain returns the domain the request was addressed to, taken from the
+// Host header without any port, or fallback if that is not a valid domain.
+func rootDomain(r *http.Request, fallback string) string {
+	host := r.Host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	if d, ok := normalizeDomain(host); ok {
+		return d
+	}
+	return fallback
 }
 
 func envOr(key, def string) string {
