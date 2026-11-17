@@ -75,7 +75,20 @@ func main() {
 		res := lookups.get(d)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
-		execute(w, r, "head", d)
+		// Link-preview bots read the meta tags but run no scripts, so they
+		// wait for the result to get the right theme color in <head>.
+		if isPreviewBot(r.UserAgent()) {
+			select {
+			case <-res.done:
+			case <-r.Context().Done():
+				return
+			}
+		}
+		theme := defaultThemeColor
+		if res.finished() {
+			theme = res.keyColor(d)
+		}
+		execute(w, r, "head", d, theme)
 		if f, ok := w.(http.Flusher); ok {
 			f.Flush()
 		}
@@ -85,7 +98,11 @@ func main() {
 			return
 		}
 		io.WriteString(w, `<pre class="out">`+ansiToHTML(string(res.out))+"</pre>\n")
-		execute(w, r, "tail", d)
+		if c := res.keyColor(d); c != theme {
+			// c is always "#rrggbb" from our own palette, so it is safe to inline.
+			io.WriteString(w, `<script>document.querySelector('meta[name="theme-color"]').content="`+c+`"</script>`+"\n")
+		}
+		execute(w, r, "tail", d, "")
 	}
 
 	// The root page shows the lookup for the hostname it was requested on,
@@ -189,6 +206,9 @@ const releasesURL = "https://github.com/JacobWennebro/dossier/releases"
 // pageData is what the templates see.
 type pageData struct {
 	Domain      string
+	ThemeColor  string   // for <meta name="theme-color">: the CLI's key color for this domain
+	Version     string   // dossier version this server was built from
+	VersionURL  string   // release page for Version, or "" for development builds
 	PageURL     string   // absolute URL of this page, for og:url
 	ImageURL    string   // absolute URL of the preview image, for og:image
 	OS          string   // "Windows", "Mac", "Linux" or "" when unknown
@@ -198,10 +218,13 @@ type pageData struct {
 
 var platforms = []string{"Windows", "Mac", "Linux"}
 
-func execute(w http.ResponseWriter, r *http.Request, name, domain string) {
+func execute(w http.ResponseWriter, r *http.Request, name, domain, theme string) {
 	w.Header().Add("Vary", "User-Agent")
 	plat := detectOS(r.UserAgent())
-	data := pageData{Domain: domain, OS: plat, ReleasesURL: releasesURL}
+	data := pageData{Domain: domain, ThemeColor: theme, OS: plat, ReleasesURL: releasesURL, Version: cli.Version()}
+	if releaseTagRE.MatchString(data.Version) {
+		data.VersionURL = releasesURL + "/tag/" + data.Version
+	}
 	if domain != "" {
 		base := baseURL(r)
 		data.PageURL = base + r.URL.Path
@@ -251,6 +274,34 @@ type result struct {
 	ogOnce sync.Once // the preview image is rendered on first request
 	og     []byte
 	ogErr  error
+}
+
+func (r *result) finished() bool {
+	select {
+	case <-r.done:
+		return true
+	default:
+		return false
+	}
+}
+
+// defaultThemeColor is used until a lookup's key color is known: the page
+// background.
+const defaultThemeColor = "#0d1117"
+
+// keyColor returns the color the CLI used for the domain title and keys,
+// which comes from the detected provider's logo, as "#rrggbb". Call it only
+// after done is closed.
+func (r *result) keyColor(domain string) string {
+	segs := parseANSI(string(r.out))
+	for _, want := range []string{domain, "Took"} { // the title, else the last key
+		for _, s := range segs {
+			if s.Text == want && s.Bold && s.FG != "" {
+				return s.FG
+			}
+		}
+	}
+	return defaultThemeColor
 }
 
 // image returns the result's preview PNG, rendering it once. Call it only
@@ -321,6 +372,20 @@ func rootDomain(r *http.Request, fallback string) string {
 		return d
 	}
 	return fallback
+}
+
+// releaseTagRE matches the tags the release workflow creates.
+var releaseTagRE = regexp.MustCompile(`^v\d+\.\d+\.\d+$`)
+
+// isPreviewBot reports whether ua belongs to a link-preview crawler.
+func isPreviewBot(ua string) bool {
+	ua = strings.ToLower(ua)
+	for _, s := range []string{"bot", "facebookexternalhit", "embedly", "whatsapp", "slack", "discord", "telegram", "skype", "vkshare", "pinterest", "iframely"} {
+		if strings.Contains(ua, s) {
+			return true
+		}
+	}
+	return false
 }
 
 // baseURL returns the scheme and host the request was made to. Behind a TLS

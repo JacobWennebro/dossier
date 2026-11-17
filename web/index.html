@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{with .Domain}}{{.}} · {{end}}dossier</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="{{or .ThemeColor "#0d1117"}}">
 {{- if .Domain}}
 <meta name="description" content="DNS, registration (RDAP), hosting and page metadata for {{.Domain}}.">
 <meta property="og:type" content="website">
@@ -92,7 +93,7 @@
   </a>
   <span>{{if .OS}}Also for {{index .OtherOS 0}} and {{index .OtherOS 1}}{{else}}For Windows, Mac and Linux{{end}} · free and open source</span>
 </div>
-<footer>Tool built by <a href="https://wennebro.com">Jacob Wennebro</a>.</footer>
+<footer>Tool built by <a href="https://wennebro.com">Jacob Wennebro</a> · Running dossier {{if .VersionURL}}<a href="{{.VersionURL}}">{{.Version}}</a>{{else}}{{.Version}}{{end}}</footer>
 </main>
 </body>
 </html>

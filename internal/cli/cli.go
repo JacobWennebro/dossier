@@ -27,6 +27,9 @@ import (
 // Set at build time via -ldflags "-X dossier/internal/cli.version=...".
 var version = "dev"
 
+// Version returns the version dossier was built as, e.g. "v0.1.2" or "dev".
+func Version() string { return version }
+
 // maxValueWidth truncates long values so rows stay on one line.
 const maxValueWidth = 72
 
