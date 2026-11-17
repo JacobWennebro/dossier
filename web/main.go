@@ -2,6 +2,7 @@
 //
 //	GET /                 the output for the requested hostname, or DEFAULT_DOMAIN (example.com unless set)
 //	GET /{domain}         the output of "dossier {domain}" as colored HTML
+//	GET /og/{domain}.png  a 1200×630 preview image of the output, for og:image
 //	GET /raw/{domain}     the raw ANSI output of "dossier -color always {domain}"
 package main
 
@@ -65,7 +66,7 @@ func main() {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok\n"))
 	})
-	lookups := newCache(2*time.Minute, 10000)
+	lookups := newCache(30*time.Minute, 10000)
 
 	// showResult sends the top of the page right away (the browser shows the
 	// form and, if the lookup is slow, a loading line), then streams the
@@ -109,6 +110,31 @@ func main() {
 			return
 		}
 		showResult(w, r, d)
+	})
+	// Preview image for link unfurls (Slack, Discord, X, iMessage, ...),
+	// referenced from the og:image meta tag.
+	mux.HandleFunc("GET /og/{file}", func(w http.ResponseWriter, r *http.Request) {
+		name, ok := strings.CutSuffix(r.PathValue("file"), ".png")
+		d, valid := normalizeDomain(name)
+		if !ok || !valid {
+			http.NotFound(w, r)
+			return
+		}
+		res := lookups.get(d)
+		select {
+		case <-res.done:
+		case <-r.Context().Done():
+			return
+		}
+		png, err := res.image(d)
+		if err != nil {
+			log.Printf("og image %s: %v", d, err)
+			http.Error(w, "could not render image", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Cache-Control", "public, max-age=300")
+		w.Write(png)
 	})
 	mux.HandleFunc("GET /go", func(w http.ResponseWriter, r *http.Request) {
 		if d, ok := normalizeDomain(r.FormValue("d")); ok {
@@ -163,6 +189,8 @@ const releasesURL = "https://github.com/JacobWennebro/dossier/releases"
 // pageData is what the templates see.
 type pageData struct {
 	Domain      string
+	PageURL     string   // absolute URL of this page, for og:url
+	ImageURL    string   // absolute URL of the preview image, for og:image
 	OS          string   // "Windows", "Mac", "Linux" or "" when unknown
 	OtherOS     []string // the platforms not detected, for the "also for" line
 	ReleasesURL string
@@ -174,6 +202,11 @@ func execute(w http.ResponseWriter, r *http.Request, name, domain string) {
 	w.Header().Add("Vary", "User-Agent")
 	plat := detectOS(r.UserAgent())
 	data := pageData{Domain: domain, OS: plat, ReleasesURL: releasesURL}
+	if domain != "" {
+		base := baseURL(r)
+		data.PageURL = base + r.URL.Path
+		data.ImageURL = base + "/og/" + domain + ".png"
+	}
 	for _, p := range platforms {
 		if p != plat {
 			data.OtherOS = append(data.OtherOS, p)
@@ -214,6 +247,17 @@ type result struct {
 	done chan struct{} // closed when out and at are set
 	out  []byte
 	at   time.Time
+
+	ogOnce sync.Once // the preview image is rendered on first request
+	og     []byte
+	ogErr  error
+}
+
+// image returns the result's preview PNG, rendering it once. Call it only
+// after done is closed.
+func (r *result) image(domain string) ([]byte, error) {
+	r.ogOnce.Do(func() { r.og, r.ogErr = renderOGImage(r.out, domain) })
+	return r.og, r.ogErr
 }
 
 func newCache(ttl time.Duration, maxEntries int) *cache {
@@ -277,6 +321,24 @@ func rootDomain(r *http.Request, fallback string) string {
 		return d
 	}
 	return fallback
+}
+
+// baseURL returns the scheme and host the request was made to. Behind a TLS
+// proxy the scheme comes from X-Forwarded-Proto; without one, https is
+// assumed except for localhost and IP addresses.
+func baseURL(r *http.Request) string {
+	scheme := "https"
+	host := r.Host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	switch p := r.Header.Get("X-Forwarded-Proto"); {
+	case p == "http" || p == "https":
+		scheme = p
+	case r.TLS == nil && (host == "localhost" || net.ParseIP(strings.Trim(host, "[]")) != nil):
+		scheme = "http"
+	}
+	return scheme + "://" + r.Host
 }
 
 func envOr(key, def string) string {

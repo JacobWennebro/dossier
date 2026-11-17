@@ -6,6 +6,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{with .Domain}}{{.}} · {{end}}dossier</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+{{- if .Domain}}
+<meta name="description" content="DNS, registration (RDAP), hosting and page metadata for {{.Domain}}.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="dossier">
+<meta property="og:title" content="{{.Domain}} · dossier">
+<meta property="og:description" content="DNS, registration (RDAP), hosting and page metadata for {{.Domain}}.">
+<meta property="og:url" content="{{.PageURL}}">
+<meta property="og:image" content="{{.ImageURL}}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="dossier output for {{.Domain}}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{.Domain}} · dossier">
+<meta name="twitter:description" content="DNS, registration (RDAP), hosting and page metadata for {{.Domain}}.">
+<meta name="twitter:image" content="{{.ImageURL}}">
+{{- end}}
 <style>
   :root { color-scheme: dark; --bg: #0d1117; --panel: #161b22; --border: #30363d;
     --fg: #e6edf3; --muted: #8b949e; --accent: #3fb950;

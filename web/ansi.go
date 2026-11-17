@@ -34,46 +34,41 @@ func color256(n int) string {
 	}
 }
 
-// ansiToHTML converts text with SGR escape sequences (reset, bold, 16 and
-// 256 colors) into HTML-escaped text wrapped in styled <span>s. Other escape
-// sequences are dropped.
-func ansiToHTML(s string) string {
+// segment is a run of text drawn in one style. FG is a hex color, or ""
+// for the default foreground.
+type segment struct {
+	Text string
+	FG   string
+	Bold bool
+}
+
+// parseANSI splits text with SGR escape sequences (reset, bold, 16, 256 and
+// 24-bit colors) into styled segments. Other escape sequences are dropped.
+// Adjacent segments always differ in style.
+func parseANSI(s string) []segment {
 	var (
-		b    strings.Builder
+		segs []segment
 		fg   string
 		bold bool
-		open bool
 	)
-	setStyle := func(newFG string, newBold bool) {
-		if newFG == fg && newBold == bold {
+	emit := func(text string) {
+		if text == "" {
 			return
 		}
-		if open {
-			b.WriteString("</span>")
-			open = false
-		}
-		fg, bold = newFG, newBold
-		if fg == "" && !bold {
+		if n := len(segs); n > 0 && segs[n-1].FG == fg && segs[n-1].Bold == bold {
+			segs[n-1].Text += text
 			return
 		}
-		b.WriteString(`<span style="`)
-		if fg != "" {
-			b.WriteString("color:" + fg + ";")
-		}
-		if bold {
-			b.WriteString("font-weight:bold;")
-		}
-		b.WriteString(`">`)
-		open = true
+		segs = append(segs, segment{text, fg, bold})
 	}
 
 	for len(s) > 0 {
 		i := strings.IndexByte(s, 0x1b)
 		if i < 0 {
-			b.WriteString(html.EscapeString(s))
+			emit(s)
 			break
 		}
-		b.WriteString(html.EscapeString(s[:i]))
+		emit(s[:i])
 		s = s[i+1:]
 		if len(s) == 0 || s[0] != '[' {
 			continue
@@ -89,40 +84,57 @@ func ansiToHTML(s string) string {
 			continue
 		}
 
-		newFG, newBold := fg, bold
 		codes := strings.Split(params, ";")
 		for j := 0; j < len(codes); j++ {
 			n, _ := strconv.Atoi(codes[j]) // "" means 0
 			switch {
 			case n == 0:
-				newFG, newBold = "", false
+				fg, bold = "", false
 			case n == 1:
-				newBold = true
+				bold = true
 			case n == 22:
-				newBold = false
+				bold = false
 			case n >= 30 && n <= 37:
-				newFG = basic16[n-30]
+				fg = basic16[n-30]
 			case n >= 90 && n <= 97:
-				newFG = basic16[n-90+8]
+				fg = basic16[n-90+8]
 			case n == 39:
-				newFG = ""
+				fg = ""
 			case n == 38 && j+2 < len(codes) && codes[j+1] == "5":
 				if c, err := strconv.Atoi(codes[j+2]); err == nil && c >= 0 && c < 256 {
-					newFG = color256(c)
+					fg = color256(c)
 				}
 				j += 2
 			case n == 38 && j+4 < len(codes) && codes[j+1] == "2":
 				r, _ := strconv.Atoi(codes[j+2])
 				g, _ := strconv.Atoi(codes[j+3])
 				bl, _ := strconv.Atoi(codes[j+4])
-				newFG = fmt.Sprintf("#%02x%02x%02x", r&255, g&255, bl&255)
+				fg = fmt.Sprintf("#%02x%02x%02x", r&255, g&255, bl&255)
 				j += 4
 			}
 		}
-		setStyle(newFG, newBold)
 	}
-	if open {
-		b.WriteString("</span>")
+	return segs
+}
+
+// ansiToHTML converts text with SGR escape sequences into HTML-escaped text
+// wrapped in styled <span>s.
+func ansiToHTML(s string) string {
+	var b strings.Builder
+	for _, seg := range parseANSI(s) {
+		text := html.EscapeString(seg.Text)
+		if seg.FG == "" && !seg.Bold {
+			b.WriteString(text)
+			continue
+		}
+		b.WriteString(`<span style="`)
+		if seg.FG != "" {
+			b.WriteString("color:" + seg.FG + ";")
+		}
+		if seg.Bold {
+			b.WriteString("font-weight:bold;")
+		}
+		b.WriteString(`">` + text + "</span>")
 	}
 	return b.String()
 }
